@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map Application</title>
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        #mapContainer {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+        #mapCanvas {
+            position: absolute;
+        }
+        #controls {
+            width: 300px;
+            padding: 20px;
+            background-color: #2a2a2a;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        button:hover {
+            background-color: #4a4a4a;
+        }
+        #commandOutput {
+            margin-top: 20px;
+            border: 1px solid #444;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background-color: #252525;
+        }
+        .active {
+            background-color: #5a5a5a !important;
+        }
+        
+        /* Loading Screen Styles */
+		#loadingScreen {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: rgba(30, 30, 30, 0.9);
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			z-index: 1000;
+			color: white;
+			text-align: center;
+		}
+		
+		.loader {
+			border: 8px solid rgba(255,255,255,0.3);
+			border-radius: 50%;
+			border-top-color: #ffffff;
+			width: 60px;
+			height: 60px;
+			animation: spin 1s linear infinite;
+			margin-bottom: 20px;
+		}
+
+		#loadingText {
+			font-size: 18px;
+			margin-bottom: 15px;
+		}
+
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+    </style>
+</head>
+<body>
+	<div id="loadingScreen">
+		<div id="loadingText">Loading Website... this may take a moment</div>
+		<div class="loader"></div>
+	</div>
+    
+    <div id="mapContainer">
+        <canvas id="mapCanvas"></canvas>
+    </div>
+    <div id="controls">
+        <div class="button-group">
+            <button id="zoomIn">Zoom In</button>
+            <button id="zoomOut">Zoom Out</button>
+        </div>
+        <div class="button-group">
+            <button id="rotateLeft">Rotate Left</button>
+            <button id="rotateRight">Rotate Right</button>
+        </div>
+        <div class="button-group">
+            <button id="lineTool">Line Tool</button>
+            <button id="startPoint">Set Start Point</button>
+        </div>
+        <div class="button-group">
+            <button id="jump">Jump</button>
+            <button id="sleep">Sleep</button>
+        </div>
+        <div class="button-group">
+            <button id="playback">Playback</button>
+            <button id="copyCommands">Copy Commands</button>
+            <button id="clearCommands">Clear Commands</button>
+        </div>
+        <div id="commandOutput"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Update this link to your Dropbox direct link
+        const mapImage = new Image();
+        mapImage.src = 'https://www.dropbox.com/scl/fi/5k8tygktvme5perurji8b/map.png?rlkey=5wudo0g6lap6vcb2zw4emciud&st=sdm8gjfi&dl=1'; // Your modified Dropbox link
+        
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        let isDragging = false;
+        let lastX, lastY;
+
+        let isDrawing = false;
+        let startX, startY;
+
+        let player;
+
+        let lineTool = { active: false };
+        
+        let setStartPoint = false;
+
+        let lastLineEnd = null;
+
+       // Show loading screen while image loads
+       const loadingScreen = document.getElementById('loadingScreen');
+
+       mapImage.onload = () => {
+           loadingScreen.style.display = 'none'; // Hide loading screen
+           canvas.width = mapImage.width;
+           canvas.height = mapImage.height;
+
+           player = new Player(canvas.width / 2, canvas.height / 2, 0);
+           lastLineEnd = { x: player.x, y: player.y };
+           draw();
+       };
+
+       class Player {
+           constructor(x, y, direction) {
+               this.x = x;
+               this.y = y;
+               this.direction = direction;
+           }
+
+           draw(ctx) {
+               ctx.save();
+               ctx.translate(this.x, this.y);
+               ctx.rotate(this.direction * Math.PI / 4);
+               ctx.fillStyle = 'red';
+               ctx.beginPath();
+               ctx.moveTo(0, -10);
+               ctx.lineTo(5, 5);
+               ctx.lineTo(-5, 5);
+               ctx.closePath();
+               ctx.fill();
+               ctx.restore();
+           }
+
+           rotate(direction) {
+               this.direction = (this.direction + direction + 8) % 8; // Ensure direction stays within bounds
+               addCommand(`Rotate("${direction > 0 ? 'right' : 'left'}", 1)`);
+               draw();
+           }
+       }
+
+       function draw() {
+           ctx.setTransform(1, 0, 0, 1, 0, 0);
+           ctx.clearRect(0, 0, canvas.width, canvas.height);
+           ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+           ctx.drawImage(mapImage, 0, 0);
+           player.draw(ctx);
+       }
+
+       function zoom(delta) {
+           const oldScale = scale; // Store current scale for calculations
+           scale += delta; // Adjust scale by delta
+           
+           // Clamp scale between min and max values
+           scale = Math.max(0.1, Math.min(scale, 5));
+           
+           const mouseX = canvas.width / 2; // Get mouse x position
+           const mouseY = canvas.height / 2; // Get mouse y position
+
+          // Adjust offsets based on new scale
+          offsetX += (mouseX / oldScale - mouseX / scale) * scale; 
+          offsetY += (mouseY / oldScale - mouseY / scale) * scale;
+
+          draw(); // Redraw the canvas with new scale and offsets
+       }
+
+       canvas.addEventListener('mousedown', (e) => {
+          if (lineTool.active) { // If line tool is active
+              isDrawing = true; // Start drawing mode
+              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
+              startX = (e.clientX - rect.left - offsetX) / scale; // Calculate start x position
+              startY = (e.clientY - rect.top - offsetY) / scale; // Calculate start y position
+
+              if (!lastLineEnd) { // If no last line end point exists
+                  lastLineEnd = { x: player.x, y: player.y }; // Set to player's current position
+              }
+          } else if (setStartPoint) { // If setting start point
+              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
+              player.x = (e.clientX - rect.left - offsetX) / scale; // Set player's x position
+              player.y = (e.clientY - rect.top - offsetY) / scale; // Set player's y position
+
+              lastLineEnd = { x: player.x, y: player.y }; // Update last line end point
+              setStartPoint = false; // Reset set start point flag
+              document.getElementById('startPoint').classList.remove('active'); // Remove active class from button
+              draw(); // Redraw the canvas with new player position
+          } else { // If not drawing or setting start point
+              isDragging = true; // Start dragging mode
+              lastX = e.clientX; // Store last mouse x position
+              lastY = e.clientY; // Store last mouse y position
+          }
+      });
+
+      canvas.addEventListener('mousemove', (e) => {
+          if (isDrawing) { // If drawing mode is active
+              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
+
+              const endX = (e.clientX - rect.left - offsetX) / scale; // Calculate end x position based on mouse movement
+              const endY = (e.clientY - rect.top - offsetY) / scale; // Calculate end y position based on mouse movement
+
+              const angle = Math.atan2(endY - lastLineEnd.y, endX - lastLineEnd.x); // Calculate angle of line being drawn
+
+              const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4); // Snap angle to nearest multiple of PI/4
+
+              const length = Math.sqrt(Math.pow(endX - lastLineEnd.x, 2) + Math.pow(endY - lastLineEnd.y, 2)); // Calculate length of line drawn
+
+              const tiles = Math.round(length / 25); // Convert length to number of tiles
+
+              draw(); // Redraw the map and player
+
+              ctx.beginPath(); 
+              ctx.moveTo(lastLineEnd.x, lastLineEnd.y); 
+              ctx.lineTo(lastLineEnd.x + Math.cos(snappedAngle) * tiles * 25,
+                         lastLineEnd.y + Math.sin(snappedAngle) * tiles * 25); 
+
+              ctx.strokeStyle = 'yellow'; 
+              ctx.lineWidth = 2; 
+              ctx.stroke(); 
+          } else if (isDragging) { 
+              const dx = e.clientX - lastX; 
+              const dy = e.clientY - lastY;
+
+             offsetX += dx; 
+             offsetY += dy;
+
+             lastX = e.clientX; 
+             lastY = e.clientY;
+
+             draw(); 
+         } 
+     });
+
+     canvas.addEventListener('mouseup', (e) => { 
+         if (isDrawing) { 
+             const rect = canvas.getBoundingClientRect(); 
+
+             const endX = (e.clientX - rect.left - offsetX) / scale; 
+
+             const endY = (e.clientY - rect.top - offsetY) / scale;
+
+             const angle = Math.atan2(endY - lastLineEnd.y,
+                                      endX - lastLineEnd.x); 
+
+             const snappedAngle =
+                 Math.round(angle / (Math.PI / 4)) * (Math.PI / 4); 
+
+             const length =
+                 Math.sqrt(Math.pow(endX - lastLineEnd.x,
+                                    2) + Math.pow(endY -
+                                    lastLineEnd.y,
+                                    2)); 
+
+             const tiles =
+                 Math.round(length /25); 
+
+             generateMoveCommand(tiles,
+                                 snappedAngle); 
+
+             lastLineEnd =
+                 { x:lastLineEnd.x +
+                 Math.cos(snappedAngle)
+                 * tiles *25,
+                 y:lastLineEnd.y +
+                 Math.sin(snappedAngle)
+                 * tiles *25 }; 
+
+         } 
+
+         isDragging =
+             false;
+
+         isDrawing =
+             false;
+
+     });
+
+     function generateMoveCommand(tiles,
+                                   angle) { 
+
+         const directions =
+             ['w', 'wd', 'd', 'sd',
+             's', 'sa', 'a', 'wa'];
+
+         const dirIndex =
+             (Math.round(angle /
+                         (Math.PI /
+                        4)) +8 ) %8 ;
+
+         const relativeDir =
+             (dirIndex -
+             player.direction +8 ) %8 ;
+
+         let command =
+             `Move(${tiles},
+                   "${directions[relativeDir]}")`;
+
+         addCommand(command);
+
+     }
+
+     function addCommand(command) { 
+
+         const commandOutput =
+             document.getElementById('commandOutput');
+
+         commandOutput.innerHTML += command +
+                                   '<br>'; 
+
+     }
+
+     function clearCommands() {
+
+         document.getElementById('commandOutput').innerHTML =
+             '';
+
+         lastLineEnd =
+             { x :player.x,
+               y :player.y };
+
+     }
+
+     async function playbackCommands() {
+
+         const commands =
+             document.getElementById('commandOutput').innerHTML.split('<br>');
+
+         lastLineEnd =
+             { x :player.x,
+               y :player.y };
+
+         for(const command of commands){
+
+             if(command.startsWith('Move')){
+
+                 const [tiles,direction] =
+                     command.match(/\d+|"[^"]+"/g);
+
+                 await movePlayer(parseInt(tiles),
+                                  direction.replace(/"/g,''));
+
+             } else if(command.startsWith('Rotate')){
+
+                 const direction =
+                     command.includes('left') ?-1 :1 ;
+
+                 await rotatePlayer(direction);
+
+             } else if(command === 'Jump') {
+
+                await new Promise(resolve => setTimeout(resolve,
+                                   500));
+
+                } else if(command.startsWith('Hypersleep')) {
+
+                    const duration =
+                        parseInt(command.split(' ')[1]);
+
+                    await new Promise(resolve => setTimeout(resolve,duration));
+
+                }
+
+         }
+
+     }
+
+     function movePlayer(tiles,direction){
+
+         return new Promise(resolve => {
+
+             const dirMap =
+                 {'w':0,'wd':1,'d':2,'sd':3,
+                  's':4,'sa':5,'a':6,'wa':7};
+
+             const moveDir =
+                 (dirMap[direction] +
+                  player.direction)%8;
+
+             const angle =
+                 moveDir *Math.PI/4;
+
+             player.x += Math.cos(angle)*tiles*25;
+
+             player.y += Math.sin(angle)*tiles*25;
+
+             lastLineEnd ={x :player.x,y :player.y};
+
+             draw();
+
+             setTimeout(resolve,
+                       1000);
+
+         });
+
+     }
+
+     function rotatePlayer(direction){
+
+         return new Promise(resolve => {
+
+             player.rotate(direction);
+
+             setTimeout(resolve,
+                       500);
+
+         });
+
+     }
+
+     document.getElementById('zoomIn').addEventListener('click',
+                                                        () => zoom(0.1));
+
+     document.getElementById('zoomOut').addEventListener('click',
+                                                         () => zoom(-0.1));
+
+     document.getElementById('rotateLeft').addEventListener('click',
+                                                            () => player.rotate(-1));
+
+     document.getElementById('rotateRight').addEventListener('click',
+                                                             () => player.rotate(1));
+
+     document.getElementById('lineTool').addEventListener('click',
+                                                          () => {
+
+                                                              lineTool.active =
+                                                                  !lineTool.active;
+
+                                                              document.getElementById('lineTool').classList.toggle('active');
+
+                                                          });
+
+     document.getElementById('startPoint').addEventListener('click',
+                                                            () => {
+
+                                                                setStartPoint =
+                                                                    !setStartPoint;
+
+                                                                document.getElementById('startPoint').classList.toggle('active');
+
+                                                            });
+
+     document.getElementById('playback').addEventListener('click',
+                                                           playbackCommands);
+
+     document.getElementById('copyCommands').addEventListener('click',
+                                                              () => {
+
+                                                                  const commandOutput =
+                                                                      document.getElementById('commandOutput').innerText;
+
+                                                                  navigator.clipboard.writeText(commandOutput).then(() => {
+
+                                                                      alert('Commands copied to clipboard!');
+
+                                                                  });
+
+                                                              });
+
+     document.getElementById('clearCommands').addEventListener('click',
+                                                               clearCommands);
+
+     document.getElementById('jump').addEventListener('click',
+                                                     () => addCommand('Jump()'));
+
+     document.getElementById('sleep').addEventListener('click', () => {
+
+         const duration =
+                prompt("Enter sleep duration in milliseconds:", "1000");
+
+         if(duration !== null && !isNaN(duration)){
+
+                addCommand(`Hypersleep ${duration}`);
+
+         }
+
+     });
+
+     window.addEventListener('resize', () => {
+
+         canvas.width =
+                mapContainer.clientWidth;
+
+         canvas.height =
+                mapContainer.clientHeight;
+
+         draw();
+
+     });
+
+      const mapContainer =
+          document.getElementById('mapContainer');
+
+      canvas.width =
+          mapContainer.clientWidth;
+
+      canvas.height =
+          mapContainer.clientHeight;
+
+    </script>   
+</body>   
+</html>
+
