@@ -116,10 +116,6 @@
     </div>
     <div id="controls">
         <div class="button-group">
-            <button id="zoomIn">Zoom In</button>
-            <button id="zoomOut">Zoom Out</button>
-        </div>
-        <div class="button-group">
             <button id="rotateLeft">Rotate Left</button>
             <button id="rotateRight">Rotate Right</button>
         </div>
@@ -199,20 +195,31 @@
             constructor(x, y, direction) {
                 this.x = x;
                 this.y = y;
-                this.direction = direction; // 0 = north, increases clockwise
+                this.direction = direction;
             }
 
             draw(ctx) {
                 ctx.save();
                 ctx.translate(this.x, this.y);
-                ctx.rotate((this.direction - 2) * Math.PI / 4); // Adjust rotation to make 0 point north
-                ctx.fillStyle = 'red';
+                ctx.rotate(this.direction * Math.PI / 4);
+                
+                ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.moveTo(0, -10);
-                ctx.lineTo(5, 5);
-                ctx.lineTo(-5, 5);
+                ctx.moveTo(0, -12);
+                ctx.lineTo(8, 8);
+                ctx.lineTo(-8, 8);
                 ctx.closePath();
                 ctx.fill();
+                
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ff00ff';
+                ctx.beginPath();
+                ctx.arc(0, -8, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
                 ctx.restore();
             }
 
@@ -365,9 +372,9 @@
         document.getElementById('redo').addEventListener('click', redo);
 
         function generateMoveCommand(tiles, angle) {
-            let dirIndex = (Math.round(angle / (Math.PI / 4)) + 6) % 8;
+            let dirIndex = (Math.round(angle / (Math.PI / 4)) + 2) % 8;
             const directions = ['w', 'wd', 'd', 'sd', 's', 'sa', 'a', 'wa'];
-            
+
             const relativeDir = (dirIndex - player.direction + 8) % 8;
             let command = `Move(${tiles}, "${directions[relativeDir]}")`;
             addCommand(command);
@@ -480,8 +487,6 @@
             });
         }
 
-        document.getElementById('zoomIn').addEventListener('click', () => zoom(0.1));
-        document.getElementById('zoomOut').addEventListener('click', () => zoom(-0.1));
         document.getElementById('rotateLeft').addEventListener('click', () => player.rotate(-1));
         document.getElementById('rotateRight').addEventListener('click', () => player.rotate(1));
         
