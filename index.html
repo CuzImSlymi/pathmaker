@@ -98,6 +98,7 @@
         <div id="loadingText">Loading Website... this may take a moment</div>
         <div class="loader"></div>
     </div>
+    
     <div id="mapContainer">
         <canvas id="mapCanvas"></canvas>
     </div>
@@ -117,6 +118,7 @@
         <div class="button-group">
             <button id="jump">Jump</button>
             <button id="sleep">Sleep</button>
+            <button id="pressE">Press E</button>
         </div>
         <div class="button-group">
             <button id="playback">Playback</button>
@@ -126,16 +128,17 @@
         <div id="commandOutput"></div>
     </div>
 
-    console.log("v1.01")
-    
     <script>
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
+        
         const mapImage = new Image();
         mapImage.src = 'https://www.dropbox.com/scl/fi/8tpllweb1d9rls9qcrpad/map.jpg?rlkey=dsk74qiiw0h8scfu9vrmrqa3v&st=ee4cfj2a&dl=1';
+        
         let scale = 1;
         let offsetX = 0;
         let offsetY = 0;
+        
         let isDragging = false;
         let lastX, lastY;
         let isDrawing = false;
@@ -144,28 +147,43 @@
         let lineTool = { active: false };
         let setStartPoint = false;
         let lastLineEnd = null;
-        const loadingScreen = document.getElementById('loadingScreen');
-
-        mapImage.onload = () => {
-            loadingScreen.style.display = 'none';
-            canvas.width = mapImage.width;
-            canvas.height = mapImage.height;
-            player = new Player(canvas.width / 2, canvas.height / 2, 0);
-            lastLineEnd = { x: player.x, y: player.y };
-            draw();
-        };
+        
+        function drawArrow(fromx, fromy, tox, toy, color = 'yellow') {
+            const headlen = 10;
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Arrow head
+            ctx.beginPath();
+            ctx.moveTo(tox, toy);
+            ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6),
+                      toy - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6),
+                      toy - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
 
         class Player {
             constructor(x, y, direction) {
                 this.x = x;
                 this.y = y;
-                this.direction = direction;
+                this.direction = direction; // 0 = north, increases clockwise
             }
 
             draw(ctx) {
                 ctx.save();
                 ctx.translate(this.x, this.y);
-                ctx.rotate(this.direction * Math.PI / 4);
+                ctx.rotate((this.direction - 2) * Math.PI / 4); // Adjust rotation to make 0 point north
                 ctx.fillStyle = 'red';
                 ctx.beginPath();
                 ctx.moveTo(0, -10);
@@ -183,24 +201,53 @@
             }
         }
 
+        mapImage.onload = () => {
+            loadingScreen.style.display = 'none';
+            canvas.width = mapImage.width;
+            canvas.height = mapImage.height;
+            player = new Player(canvas.width / 2, canvas.height / 2, 2); // Start facing north
+            lastLineEnd = { x: player.x, y: player.y };
+            draw();
+        };
+
         function draw() {
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
             ctx.drawImage(mapImage, 0, 0);
+            
+            // Draw all stored lines if any
+            if (storedLines && storedLines.length > 0) {
+                storedLines.forEach(line => {
+                    drawArrow(line.fromX, line.fromY, line.toX, line.toY);
+                });
+            }
+            
             player.draw(ctx);
         }
+
+        let storedLines = [];
 
         function zoom(delta) {
             const oldScale = scale;
             scale += delta;
             scale = Math.max(0.1, Math.min(scale, 5));
+            
             const mouseX = canvas.width / 2;
             const mouseY = canvas.height / 2;
+            
             offsetX += (mouseX / oldScale - mouseX / scale) * scale;
             offsetY += (mouseY / oldScale - mouseY / scale) * scale;
+            
             draw();
         }
+
+        // Add mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoom(delta);
+        });
 
         canvas.addEventListener('mousedown', (e) => {
             if (lineTool.active) {
@@ -208,6 +255,7 @@
                 const rect = canvas.getBoundingClientRect();
                 startX = (e.clientX - rect.left - offsetX) / scale;
                 startY = (e.clientY - rect.top - offsetY) / scale;
+                
                 if (!lastLineEnd) {
                     lastLineEnd = { x: player.x, y: player.y };
                 }
@@ -218,6 +266,7 @@
                 lastLineEnd = { x: player.x, y: player.y };
                 setStartPoint = false;
                 document.getElementById('startPoint').classList.remove('active');
+                storedLines = []; // Clear stored lines when setting new start point
                 draw();
             } else {
                 isDragging = true;
@@ -231,17 +280,21 @@
                 const rect = canvas.getBoundingClientRect();
                 const endX = (e.clientX - rect.left - offsetX) / scale;
                 const endY = (e.clientY - rect.top - offsetY) / scale;
+                
                 const angle = Math.atan2(endY - lastLineEnd.y, endX - lastLineEnd.x);
                 const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+                
                 const length = Math.sqrt(Math.pow(endX - lastLineEnd.x, 2) + Math.pow(endY - lastLineEnd.y, 2));
                 const tiles = Math.round(length / 25);
+                
                 draw();
-                ctx.beginPath();
-                ctx.moveTo(lastLineEnd.x, lastLineEnd.y);
-                ctx.lineTo(lastLineEnd.x + Math.cos(snappedAngle) * tiles * 25, lastLineEnd.y + Math.sin(snappedAngle) * tiles * 25);
-                ctx.strokeStyle = 'yellow';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                
+                drawArrow(
+                    lastLineEnd.x,
+                    lastLineEnd.y,
+                    lastLineEnd.x + Math.cos(snappedAngle) * tiles * 25,
+                    lastLineEnd.y + Math.sin(snappedAngle) * tiles * 25
+                );
             } else if (isDragging) {
                 const dx = e.clientX - lastX;
                 const dy = e.clientY - lastY;
@@ -258,11 +311,23 @@
                 const rect = canvas.getBoundingClientRect();
                 const endX = (e.clientX - rect.left - offsetX) / scale;
                 const endY = (e.clientY - rect.top - offsetY) / scale;
+                
                 const angle = Math.atan2(endY - lastLineEnd.y, endX - lastLineEnd.x);
                 const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+                
                 const length = Math.sqrt(Math.pow(endX - lastLineEnd.x, 2) + Math.pow(endY - lastLineEnd.y, 2));
                 const tiles = Math.round(length / 25);
+                
+                // Store the line
+                storedLines.push({
+                    fromX: lastLineEnd.x,
+                    fromY: lastLineEnd.y,
+                    toX: lastLineEnd.x + Math.cos(snappedAngle) * tiles * 25,
+                    toY: lastLineEnd.y + Math.sin(snappedAngle) * tiles * 25
+                });
+                
                 generateMoveCommand(tiles, snappedAngle);
+                
                 lastLineEnd = {
                     x: lastLineEnd.x + Math.cos(snappedAngle) * tiles * 25,
                     y: lastLineEnd.y + Math.sin(snappedAngle) * tiles * 25
@@ -270,12 +335,14 @@
             }
             isDragging = false;
             isDrawing = false;
+            draw();
         });
 
         function generateMoveCommand(tiles, angle) {
             const directions = ['w', 'wd', 'd', 'sd', 's', 'sa', 'a', 'wa'];
             const dirIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
             const relativeDir = (dirIndex - player.direction + 8) % 8;
+            
             let command = `Move(${tiles}, "${directions[relativeDir]}")`;
             addCommand(command);
         }
@@ -283,24 +350,32 @@
         function addCommand(command) {
             const commandOutput = document.getElementById('commandOutput');
             commandOutput.innerHTML += command + '<br>';
+            commandOutput.scrollTop = commandOutput.scrollHeight;
         }
 
         function clearCommands() {
             document.getElementById('commandOutput').innerHTML = '';
             lastLineEnd = { x: player.x, y: player.y };
+            storedLines = [];
+            draw();
         }
 
         async function playbackCommands() {
             const commands = document.getElementById('commandOutput').innerHTML.split('<br>');
             lastLineEnd = { x: player.x, y: player.y };
+            
             for (const command of commands) {
+                if (!command) continue;
+                
                 if (command.startsWith('Move')) {
                     const [tiles, direction] = command.match(/\d+|"[^"]+"/g);
                     await movePlayer(parseInt(tiles), direction.replace(/"/g, ''));
                 } else if (command.startsWith('Rotate')) {
                     const direction = command.includes('left') ? -1 : 1;
                     await rotatePlayer(direction);
-                } else if (command === 'Jump') {
+                } else if (command === 'Jump()') {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else if (command === 'PressE()') {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 } else if (command.startsWith('Hypersleep')) {
                     const duration = parseInt(command.split(' ')[1]);
@@ -311,13 +386,15 @@
 
         function movePlayer(tiles, direction) {
             return new Promise(resolve => {
-                const dirMap = { 'w': 0, 'wd': 1, 'd': 2, 'sd': 3, 's': 4, 'sa': 5, 'a': 6, 'wa': 7 };
+                const dirMap = {'w': 0, 'wd': 1, 'd': 2, 'sd': 3, 's': 4, 'sa': 5, 'a': 6, 'wa': 7};
                 const moveDir = (dirMap[direction] + player.direction) % 8;
                 const angle = moveDir * Math.PI / 4;
+                
                 player.x += Math.cos(angle) * tiles * 25;
                 player.y += Math.sin(angle) * tiles * 25;
                 lastLineEnd = { x: player.x, y: player.y };
                 draw();
+                
                 setTimeout(resolve, 1000);
             });
         }
@@ -333,23 +410,30 @@
         document.getElementById('zoomOut').addEventListener('click', () => zoom(-0.1));
         document.getElementById('rotateLeft').addEventListener('click', () => player.rotate(-1));
         document.getElementById('rotateRight').addEventListener('click', () => player.rotate(1));
+        
         document.getElementById('lineTool').addEventListener('click', () => {
             lineTool.active = !lineTool.active;
             document.getElementById('lineTool').classList.toggle('active');
         });
+        
         document.getElementById('startPoint').addEventListener('click', () => {
             setStartPoint = !setStartPoint;
             document.getElementById('startPoint').classList.toggle('active');
         });
+        
         document.getElementById('playback').addEventListener('click', playbackCommands);
+        
         document.getElementById('copyCommands').addEventListener('click', () => {
             const commandOutput = document.getElementById('commandOutput').innerText;
             navigator.clipboard.writeText(commandOutput).then(() => {
                 alert('Commands copied to clipboard!');
             });
         });
+        
         document.getElementById('clearCommands').addEventListener('click', clearCommands);
         document.getElementById('jump').addEventListener('click', () => addCommand('Jump()'));
+        document.getElementById('pressE').addEventListener('click', () => addCommand('PressE()'));
+        
         document.getElementById('sleep').addEventListener('click', () => {
             const duration = prompt("Enter sleep duration in milliseconds:", "1000");
             if (duration !== null && !isNaN(duration)) {
