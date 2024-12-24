@@ -466,45 +466,36 @@
         }
 
     function movePlayer(tiles, direction) {
-            return new Promise(resolve => {
-                const dirMap = {'w': 0, 'wd': 1, 'd': 2, 'sd': 3, 's': 4, 'sa': 5, 'a': 6, 'wa': 7};
-                const moveDir = (dirMap[direction] + player.direction) % 8;
-                const angle = moveDir * Math.PI / 4;
-                
-                const startX = player.x;
-                const startY = player.y;
-                const distance = tiles * 25;
-                const endX = startX + Math.cos(angle) * distance;
-                const endY = startY + Math.sin(angle) * distance;
-                
-                const duration = 1000; // 1 second per movement
-                const startTime = performance.now();
-                
-                function animate(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-                    
-                    // Smooth easing function
-                    const eased = progress < 0.5 
-                        ? 2 * progress * progress 
-                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                    
-                    player.x = startX + (endX - startX) * eased;
-                    player.y = startY + (endY - startY) * eased;
-                    lastLineEnd = { x: player.x, y: player.y };
-                    
-                    draw();
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(animate);
-                    } else {
-                        setTimeout(resolve, 100); // Small pause between movements
-                    }
+        return new Promise(resolve => {
+            const dirMap = {'w': 0, 'wd': 1, 'd': 2, 'sd': 3, 's': 4, 'sa': 5, 'a': 6, 'wa': 7};
+            const moveDir = dirMap[direction];
+            const angle = moveDir * Math.PI / 4;
+            const startX = player.x;
+            const startY = player.y;
+            const distance = tiles * 25;
+            const endX = startX + Math.cos(angle) * distance;
+            const endY = startY + Math.sin(angle) * distance;
+            const duration = 1000; // 1 second per movement
+            const startTime = performance.now();
+    
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                player.x = startX + (endX - startX) * eased;
+                player.y = startY + (endY - startY) * eased;
+                lastLineEnd = { x: player.x, y: player.y };
+                draw();
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    setTimeout(resolve, 100); // Small pause between movements
                 }
-                
-                requestAnimationFrame(animate);
-            });
-        }
+            }
+            requestAnimationFrame(animate);
+        });
+    }
+
     
         function rotatePlayer(direction) {
             return new Promise(resolve => {
