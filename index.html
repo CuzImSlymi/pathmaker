@@ -136,9 +136,8 @@
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Update this link to your Dropbox direct link
         const mapImage = new Image();
-        mapImage.src = 'https://www.dropbox.com/scl/fi/5k8tygktvme5perurji8b/map.png?rlkey=5wudo0g6lap6vcb2zw4emciud&st=sdm8gjfi&dl=1'; // Your modified Dropbox link
+        mapImage.src = 'https://www.dropbox.com/scl/fi/8tpllweb1d9rls9qcrpad/map.jpg?rlkey=dsk74qiiw0h8scfu9vrmrqa3v&st=ee4cfj2a&dl=1'; 
         
         let scale = 1;
         let offsetX = 0;
@@ -158,11 +157,10 @@
 
         let lastLineEnd = null;
 
-       // Show loading screen while image loads
        const loadingScreen = document.getElementById('loadingScreen');
 
        mapImage.onload = () => {
-           loadingScreen.style.display = 'none'; // Hide loading screen
+           loadingScreen.style.display = 'none';
            canvas.width = mapImage.width;
            canvas.height = mapImage.height;
 
@@ -193,7 +191,7 @@
            }
 
            rotate(direction) {
-               this.direction = (this.direction + direction + 8) % 8; // Ensure direction stays within bounds
+               this.direction = (this.direction + direction + 8) % 8; 
                addCommand(`Rotate("${direction > 0 ? 'right' : 'left'}", 1)`);
                draw();
            }
@@ -208,8 +206,8 @@
        }
 
        function zoom(delta) {
-           const oldScale = scale; // Store current scale for calculations
-           scale += delta; // Adjust scale by delta
+           const oldScale = scale; 
+           scale += delta; 
            
            // Clamp scale between min and max values
            scale = Math.max(0.1, Math.min(scale, 5));
