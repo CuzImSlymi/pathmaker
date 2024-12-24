@@ -234,7 +234,7 @@
             loadingScreen.style.display = 'none';
             canvas.width = mapImage.width;
             canvas.height = mapImage.height;
-            player = new Player(canvas.width / 2, canvas.height / 2, 2); // Start facing north
+            player = new Player(canvas.width / 2, canvas.height / 2, 0);
             lastLineEnd = { x: player.x, y: player.y };
             draw();
         };
