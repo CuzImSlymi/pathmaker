@@ -435,6 +435,9 @@
             storedLines = [];
             storedLinesHistory = [[]];
             storedLinesHistoryIndex = 0;
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.direction = 0;
             lastLineEnd = { x: player.x, y: player.y };
             updateCommandOutput();
             updateHistoryButtons();
