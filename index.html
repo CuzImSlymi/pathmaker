@@ -49,6 +49,18 @@
         button:hover {
             background-color: #4a4a4a;
         }
+        .history-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .history-buttons button {
+            flex: 1;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
         #commandOutput {
             margin-top: 20px;
             border: 1px solid #444;
@@ -126,6 +138,10 @@
             <button id="clearCommands">Clear Commands</button>
         </div>
         <div id="commandOutput"></div>
+        <div class="history-buttons">
+            <button id="undo" disabled>Undo</button>
+            <button id="redo" disabled>Redo</button>
+        </div>
     </div>
 
     <script>
@@ -147,6 +163,12 @@
         let lineTool = { active: false };
         let setStartPoint = false;
         let lastLineEnd = null;
+
+        let commandHistory = [];
+        let currentHistoryIndex = -1;
+        let storedLines = [];
+        let storedLinesHistory = [[]];
+        let storedLinesHistoryIndex = 0;
         
         function drawArrow(fromx, fromy, tox, toy, color = 'yellow') {
             const headlen = 10;
@@ -228,25 +250,28 @@
 
         let storedLines = [];
 
-        function zoom(delta) {
+        function zoom(delta, centerX, centerY) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = centerX - rect.left;
+            const mouseY = centerY - rect.top;
+            
+            const worldX = (mouseX - offsetX) / scale;
+            const worldY = (mouseY - offsetY) / scale;
+            
             const oldScale = scale;
             scale += delta;
             scale = Math.max(0.1, Math.min(scale, 5));
             
-            const mouseX = canvas.width / 2;
-            const mouseY = canvas.height / 2;
-            
-            offsetX += (mouseX / oldScale - mouseX / scale) * scale;
-            offsetY += (mouseY / oldScale - mouseY / scale) * scale;
+            offsetX = mouseX - worldX * scale;
+            offsetY = mouseY - worldY * scale;
             
             draw();
         }
 
-        // Add mouse wheel zoom
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            zoom(delta);
+            zoom(delta, e.clientX, e.clientY);
         });
 
         canvas.addEventListener('mousedown', (e) => {
@@ -338,25 +363,76 @@
             draw();
         });
 
+        document.getElementById('undo').addEventListener('click', undo);
+        document.getElementById('redo').addEventListener('click', redo);
+
         function generateMoveCommand(tiles, angle) {
+            let dirIndex = (Math.round(angle / (Math.PI / 4)) + 6) % 8;
             const directions = ['w', 'wd', 'd', 'sd', 's', 'sa', 'a', 'wa'];
-            const dirIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
-            const relativeDir = (dirIndex - player.direction + 8) % 8;
             
+            const relativeDir = (dirIndex - player.direction + 8) % 8;
             let command = `Move(${tiles}, "${directions[relativeDir]}")`;
             addCommand(command);
         }
 
         function addCommand(command) {
             const commandOutput = document.getElementById('commandOutput');
-            commandOutput.innerHTML += command + '<br>';
+            
+            commandHistory = commandHistory.slice(0, currentHistoryIndex + 1);
+            storedLinesHistory = storedLinesHistory.slice(0, storedLinesHistoryIndex + 1);
+            
+            commandHistory.push(command);
+            currentHistoryIndex++;
+            
+            storedLinesHistory.push([...storedLines]);
+            storedLinesHistoryIndex++;
+            
+            updateCommandOutput();
+            updateHistoryButtons();
+        }
+
+        function updateCommandOutput() {
+            const commandOutput = document.getElementById('commandOutput');
+            commandOutput.innerHTML = commandHistory.join('<br>');
             commandOutput.scrollTop = commandOutput.scrollHeight;
         }
 
+        function updateHistoryButtons() {
+            document.getElementById('undo').disabled = currentHistoryIndex < 0;
+            document.getElementById('redo').disabled = currentHistoryIndex >= commandHistory.length - 1;
+        }
+
+        function undo() {
+            if (currentHistoryIndex >= 0) {
+                currentHistoryIndex--;
+                storedLinesHistoryIndex--;
+                storedLines = [...storedLinesHistory[storedLinesHistoryIndex]];
+                updateCommandOutput();
+                updateHistoryButtons();
+                draw();
+            }
+        }
+
+        function redo() {
+            if (currentHistoryIndex < commandHistory.length - 1) {
+                currentHistoryIndex++;
+                storedLinesHistoryIndex++;
+                storedLines = [...storedLinesHistory[storedLinesHistoryIndex]];
+                updateCommandOutput();
+                updateHistoryButtons();
+                draw();
+            }
+        }
+        
         function clearCommands() {
-            document.getElementById('commandOutput').innerHTML = '';
-            lastLineEnd = { x: player.x, y: player.y };
+            commandHistory = [];
+            currentHistoryIndex = -1;
             storedLines = [];
+            storedLinesHistory = [[]];
+            storedLinesHistoryIndex = 0;
+            lastLineEnd = { x: player.x, y: player.y };
+            updateCommandOutput();
+            updateHistoryButtons();
             draw();
         }
 
