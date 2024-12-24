@@ -60,8 +60,7 @@
         .active {
             background-color: #5a5a5a !important;
         }
-        
-        /* Loading Screen Styles */
+	    
 		#loadingScreen {
 			position: fixed;
 			top: 0;
@@ -209,61 +208,58 @@
            const oldScale = scale; 
            scale += delta; 
            
-           // Clamp scale between min and max values
            scale = Math.max(0.1, Math.min(scale, 5));
            
-           const mouseX = canvas.width / 2; // Get mouse x position
-           const mouseY = canvas.height / 2; // Get mouse y position
+           const mouseX = canvas.width / 2; 
+           const mouseY = canvas.height / 2; 
 
-          // Adjust offsets based on new scale
           offsetX += (mouseX / oldScale - mouseX / scale) * scale; 
           offsetY += (mouseY / oldScale - mouseY / scale) * scale;
 
-          draw(); // Redraw the canvas with new scale and offsets
+          draw(); 
        }
 
        canvas.addEventListener('mousedown', (e) => {
-          if (lineTool.active) { // If line tool is active
-              isDrawing = true; // Start drawing mode
-              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
-              startX = (e.clientX - rect.left - offsetX) / scale; // Calculate start x position
-              startY = (e.clientY - rect.top - offsetY) / scale; // Calculate start y position
+          if (lineTool.active) { 
+              isDrawing = true; 
+              const rect = canvas.getBoundingClientRect(); 
+              startX = (e.clientX - rect.left - offsetX) / scale;
+              startY = (e.clientY - rect.top - offsetY) / scale; 
 
-              if (!lastLineEnd) { // If no last line end point exists
-                  lastLineEnd = { x: player.x, y: player.y }; // Set to player's current position
+              if (!lastLineEnd) { 
+                  lastLineEnd = { x: player.x, y: player.y }; 
               }
-          } else if (setStartPoint) { // If setting start point
-              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
-              player.x = (e.clientX - rect.left - offsetX) / scale; // Set player's x position
-              player.y = (e.clientY - rect.top - offsetY) / scale; // Set player's y position
+          } else if (setStartPoint) { 
+              const rect = canvas.getBoundingClientRect(); 
+              player.x = (e.clientX - rect.left - offsetX) / scale;
+              player.y = (e.clientY - rect.top - offsetY) / scale;
 
-              lastLineEnd = { x: player.x, y: player.y }; // Update last line end point
-              setStartPoint = false; // Reset set start point flag
-              document.getElementById('startPoint').classList.remove('active'); // Remove active class from button
-              draw(); // Redraw the canvas with new player position
-          } else { // If not drawing or setting start point
-              isDragging = true; // Start dragging mode
-              lastX = e.clientX; // Store last mouse x position
-              lastY = e.clientY; // Store last mouse y position
+              lastLineEnd = { x: player.x, y: player.y }; 
+              setStartPoint = false; 
+              document.getElementById('startPoint').classList.remove('active'); 
+              draw(); 
+          } else { 
+              isDragging = true; 
+              lastX = e.clientX; 
+              lastY = e.clientY; 
           }
       });
 
       canvas.addEventListener('mousemove', (e) => {
-          if (isDrawing) { // If drawing mode is active
-              const rect = canvas.getBoundingClientRect(); // Get bounding rectangle of the canvas
+          if (isDrawing) { 
+              const rect = canvas.getBoundingClientRect(); 
 
-              const endX = (e.clientX - rect.left - offsetX) / scale; // Calculate end x position based on mouse movement
-              const endY = (e.clientY - rect.top - offsetY) / scale; // Calculate end y position based on mouse movement
+              const endX = (e.clientX - rect.left - offsetX) / scale; 
+              const endY = (e.clientY - rect.top - offsetY) / scale; 
 
-              const angle = Math.atan2(endY - lastLineEnd.y, endX - lastLineEnd.x); // Calculate angle of line being drawn
+              const angle = Math.atan2(endY - lastLineEnd.y, endX - lastLineEnd.x); 
 
-              const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4); // Snap angle to nearest multiple of PI/4
+              const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4); 
 
-              const length = Math.sqrt(Math.pow(endX - lastLineEnd.x, 2) + Math.pow(endY - lastLineEnd.y, 2)); // Calculate length of line drawn
+              const length = Math.sqrt(Math.pow(endX - lastLineEnd.x, 2) + Math.pow(endY - lastLineEnd.y, 2)); 
+              const tiles = Math.round(length / 25); 
 
-              const tiles = Math.round(length / 25); // Convert length to number of tiles
-
-              draw(); // Redraw the map and player
+              draw(); 
 
               ctx.beginPath(); 
               ctx.moveTo(lastLineEnd.x, lastLineEnd.y); 
