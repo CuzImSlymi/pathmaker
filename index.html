@@ -470,7 +470,7 @@
 
     function movePlayer(tiles, direction) {
         return new Promise(resolve => {
-            const dirMap = {'w': 0, 'wd': 1, 'd': 2, 'sd': 3, 's': 4, 'sa': 5, 'a': 6, 'wa': 7};
+            const dirMap = {'w': 2, 'wd': 3, 'd': 4, 'sd': 5, 's': 6, 'sa': 7, 'a': 8, 'wa': 1};
             const moveDir = dirMap[direction];
             const angle = moveDir * Math.PI / 4;
             const startX = player.x;
